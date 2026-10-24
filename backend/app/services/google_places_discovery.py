@@ -1,6 +1,10 @@
 import os
 import requests
 from dotenv import load_dotenv
+from app.services.api_usage import (
+    reserve_api_request,
+    UsageLimitExceeded,
+)
 
 
 load_dotenv(
@@ -117,6 +121,20 @@ def discover_businesses(city, country, niche, limit=10):
         "pageSize": min(limit, 20),
     }
 
+    
+    try:
+        reserve_api_request(
+            provider="google_places",
+            daily_limit=200,
+        )
+    except UsageLimitExceeded as exc:
+        raise DiscoveryError(str(exc)) from exc
+    except Exception as exc:
+        raise DiscoveryError(
+            "Could not reserve Google Places API usage. "
+            "The API request was not sent."
+        ) from exc
+
     try:
         response = requests.post(
             PLACES_SEARCH_URL,
@@ -124,6 +142,7 @@ def discover_businesses(city, country, niche, limit=10):
             json=payload,
             timeout=REQUEST_TIMEOUT,
         )
+
     except requests.RequestException as exc:
         raise DiscoveryError(
             "Could not connect to Google Places API"
